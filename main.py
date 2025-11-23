@@ -8,6 +8,7 @@ from pyrogram.errors import FloodWait
 from pyrogram.handlers import MessageHandler
 from pyrogram.filters import group
 from gspread import Client as ClientTable, Spreadsheet, Worksheet, service_account
+from gspread.utils import ValueInputOption
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -56,9 +57,10 @@ async def main(telegram_session: str, table_url_source: str, worksheet_title_sou
 
     while True:
         headers = worksheet_source.row_values(1)
+        headers = [headers[0], headers[1], headers[3]]
         records = worksheet_source.get_all_values()[1:]
 
-        headers += [str(datetime.datetime.now())]
+
         rows_to_dest = []
         for row_id, record in enumerate(records, 2):
             state, reff = record[2 : 4]
@@ -70,10 +72,13 @@ async def main(telegram_session: str, table_url_source: str, worksheet_title_sou
 
                     chat_id = int("-100" + str_chat_id)
                     msg_id = int(msg_id)
+                    flag_error = False
                     try:
                         if await client_telegram.get_discussion_replies_count(chat_id, msg_id) > 0:
                             async for msg in client_telegram.get_discussion_replies(chat_id, msg_id):
-                                answers.append(f"https://t.me/c/{str_chat_id}/{msg.id}")
+
+                                txt = msg.text.replace('"', "'")
+                                answers.append(f'=HYPERLINK("https://t.me/c/{str_chat_id}/{msg.id}"; "{txt}")')
 
                             print("Row: ", row_id, answers)
                     except FloodWait as exp:
@@ -81,21 +86,30 @@ async def main(telegram_session: str, table_url_source: str, worksheet_title_sou
                         await asyncio.sleep(exp.value + 0.5)
                         if await client_telegram.get_discussion_replies_count(chat_id, msg_id) > 0:
                             async for msg in client_telegram.get_discussion_replies(chat_id, msg_id):
-                                answers.append(f"https://t.me/c/{str_chat_id}/{msg.id}")
+                                txt = msg.text.replace('"', "'")
+                                answers.append(f'=HYPERLINK("https://t.me/c/{str_chat_id}/{msg.id}"; "{txt}")')
 
                             print("Row: ", row_id, answers)
                     except Exception as exp:
+                        flag_error = True
                         print(f"Row: {row_id} is error")
                         print(exp)
                     await asyncio.sleep(1.5)
-                    rows_to_dest += [
-                        record + [str(answers)]
-                    ]
+                    if flag_error and not answers:
+                        rows_to_dest += [["'" + record[0], record[1], record[3], "ОШИБКА: Нужно проверить чат"]]
+                    elif not answers:
+                        rows_to_dest += [["'" + record[0], record[1], record[3], "Ответ не поступал!"]]
+                    else:
+                        rows_to_dest += [["'" + record[0], record[1], record[3]]  + answers]
 
 
         worksheet_destination.clear()
+
         rows_to_dest.insert(0, headers)
-        worksheet_destination.insert_rows(rows_to_dest, row=1)
+        worksheet_destination.insert_row([str(datetime.datetime.now())])
+
+
+        worksheet_destination.insert_rows(rows_to_dest, row=2, value_input_option=ValueInputOption.user_entered)
         await asyncio.sleep(60)
 
 
