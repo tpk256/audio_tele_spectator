@@ -106,10 +106,9 @@ async def main(telegram_session: str, table_url_source: str, worksheet_title_sou
         worksheet_destination.clear()
 
         rows_to_dest.insert(0, headers)
-        worksheet_destination.insert_row([str(datetime.datetime.now())])
+        rows_to_dest.insert(0, ["'" + str(datetime.datetime.now())])
 
-
-        worksheet_destination.insert_rows(rows_to_dest, row=2, value_input_option=ValueInputOption.user_entered)
+        worksheet_destination.insert_rows(rows_to_dest, row=1, value_input_option=ValueInputOption.user_entered)
         await asyncio.sleep(60)
 
 
