@@ -5,3 +5,5 @@ audio-tele-a3bde8a2a231.json
 audio_tele_spectator.session
 test/
 __pycache__/
+data.json
+test.py
